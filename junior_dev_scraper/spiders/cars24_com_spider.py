@@ -13,21 +13,50 @@ from junior_dev_scraper.items import JunDevAssignmentItem
 
 class Car24ComSpider(scrapy.Spider):
     name = 'cars24_com_spider'
-    start_urls = ['https://www.cars24.com/ae/buy-used-cars-dubai/']
+
+    def start_requests(self):
+        # Define the URL and headers
+        start_url = 'https://listing-service.c24.tech/v2/vehicle?isSeoFilter=true&sf=city:DU&sf=gaId:1738878581.1695743410&size=25&spath=buy-used-cars-dubai&page={}&variant=filterV5'
+        headers = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "en-GB,en;q=0.9,en-US;q=0.8",
+            "cache-control": "no-cache",
+            "pragma": "no-cache",
+            "sec-ch-ua": "\"Microsoft Edge\";v=\"117\", \"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"117\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x_country": "AE",
+            "x_vehicle_type": "CAR"
+        }
+
+        # Change this to the desired number of pages
+        num_pages = 5
+
+        # Make requests for each page
+        for page in range(1, num_pages + 1):
+            url = start_url.format(page)
+            yield scrapy.Request(
+                url=url,
+                headers=headers,
+                callback=self.parse
+            )
 
     def parse(self, response: Response, **kwargs: Any) -> Any:
+        data = json.loads(response.text)
 
-        # Container with individual car advertisements
-        car_ads = response.css('div.TGZkx._3q5mX div._3IIl_._1xLfH')
-        for car_ad in car_ads:
-            item = JunDevAssignmentItem(
-                Brand=car_ad.css('h3.RZ4T7::text').get(default='Unknown Brand'),
-                Engine_Size=car_ad.css('ul._3ZoHn li:nth-child(3)::text').get(default='Unknown Engine Size'),
-                Year_of_Manufacture=car_ad.css('p._1i1E6::text').get(default='Unknown Manufacture Year').split('|')[0],
-                Deeplink=car_ad.css('a._1Lu5u::attr(href)').get(default='Unknown Deeplink'),
-                Fuel_Type=car_ad.css('p._1i1E6::text').get(default='Unknown Fuel Type').split('|')[1],
-                Price=car_ad.css('span._7yds2::text').get(default='Unknown Price'),
-                Model=car_ad.css('h3.RZ4T7::text').get(default='Unknown Brand').split(' ')[1],
-                Mileage=car_ad.css('ul._3ZoHn li:nth-child(2)::text').get(default='Unknown Mileage'),
-            )
-            yield item
+        if "results" in data:
+            for car_ad in data["results"]:
+                item = JunDevAssignmentItem(
+                    Brand=car_ad['make'],
+                    Engine_Size=car_ad['engineSize'],
+                    Year_of_Manufacture=car_ad['year'],
+                    Deeplink=car_ad['checkoutUrl'],
+                    Fuel_Type=car_ad['fuelType'],
+                    Price=car_ad['price'],
+                    Model=car_ad['model'],
+                    Mileage=car_ad['odometerReading']
+                )
+                yield item
